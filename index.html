@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ESP32 Temperature Graph</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial;
+      padding: 20px;
+      background: #f9f9f9;
+    }
+    h2 {
+      text-align: center;
+    }
+    canvas {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h2>Live Temperature Graph (ESP32)</h2>
+  <canvas id="tempChart" height="100"></canvas>
+
+  <script>
+    const esp32URL = "http://10.1.1.97/api/temperature"; // ← CHANGE THIS
+
+    const ctx = document.getElementById("tempChart").getContext("2d");
+    const chartData = {
+      labels: [],
+      datasets: [{
+        label: "Temperature (°C)",
+        data: [],
+        backgroundColor: "rgba(75,192,192,0.4)",
+        borderColor: "rgba(75,192,192,1)",
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+      }]
+    };
+
+    const tempChart = new Chart(ctx, {
+      type: "line",
+      data: chartData,
+      options: {
+        responsive: true,
+        scales: {
+          x: {
+            title: { display: true, text: "Time (s)" }
+          },
+          y: {
+            beginAtZero: false,
+            title: { display: true, text: "Temperature (°C)" }
+          }
+        }
+      }
+    });
+
+    let time = 0;
+
+    function fetchTemperature() {
+      fetch(esp32URL)
+        .then(res => res.json())
+        .then(data => {
+          const temp = data.temperature.toFixed(2);
+          chartData.labels.push(`${time}s`);
+          chartData.datasets[0].data.push(temp);
+          if (chartData.labels.length > 60) {
+            chartData.labels.shift();
+            chartData.datasets[0].data.shift();
+          }
+          tempChart.update();
+          time += 2;
+        })
+        .catch(err => {
+          console.error("Failed to fetch temp:", err);
+        });
+    }
+
+    setInterval(fetchTemperature, 2000); // every 2 seconds
+  </script>
+</body>
+</html>
