@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ESP32 Temperature Graph</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #f4f4f4;
+    }
+    canvas {
+      background: #fff;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 15px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Live Temperature Graph</h2>
+  <p id="status">Fetching...</p>
+  <canvas id="tempChart" width="800" height="400"></canvas>
+  <br>
+  <button onclick="downloadCSV()">Generate CSV</button>
+
+  <script>
+    const ctx = document.getElementById('tempChart').getContext('2d');
+    const tempChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Temperature (°C)',
+          data: [],
+          borderColor: 'rgba(255,99,132,1)',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1
+        }]
+      },
+      options: {
+        scales: {
+          y: {
+            beginAtZero: false
+          }
+        }
+      }
+    });
+
+    let csvData = [["Time (s)", "Temperature (°C)"]];
+    let timeCounter = 0;
+
+    function fetchTemperature() {
+      fetch("http://10.1.1.97/api/temperature")
+        .then(res => res.json())
+        .then(data => {
+          if (data && typeof data.temperature === 'number') {
+            const temp = data.temperature.toFixed(2);
+            document.getElementById("status").innerText = "Current Temp: " + temp + "°C";
+
+            timeCounter += 2;
+            tempChart.data.labels.push(timeCounter + "s");
+            tempChart.data.datasets[0].data.push(temp);
+            csvData.push([timeCounter, temp]);
+
+            // Keep max 50 points
+            if (tempChart.data.labels.length > 50) {
+              tempChart.data.labels.shift();
+              tempChart.data.datasets[0].data.shift();
+              csvData.splice(1, 1); // Remove 2nd row (oldest data), keep header
+            }
+
+            tempChart.update();
+          } else {
+            throw new Error("Invalid temperature format from server.");
+          }
+        })
+        .catch(err => {
+          document.getElementById("status").innerText = "Error fetching data.";
+          console.error("Fetch error:", err);
+        });
+    }
+
+    function downloadCSV() {
+      let csvContent = "data:text/csv;charset=utf-8," 
+        + csvData.map(e => e.join(",")).join("\n");
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csvContent));
+      link.setAttribute("download", "temperature_log.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    setInterval(fetchTemperature, 2000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ESP32 Temperature & Current Graph</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #f4f4f4;
+    }
+    #chartWrapper {
+      width: 100%;
+      overflow-x: auto;
+    }
+    canvas {
+      background: #fff;
+      border: 1px solid #ccc;
+      min-width: 1200px;
+      height: 400px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 15px 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h2>Live Temperature & Current Graph</h2>
+  <p id="status">Fetching temperature...</p>
+  <p id="currentStatus">Fetching current...</p>
+
+  <div id="chartWrapper">
+    <canvas id="tempChart"></canvas>
+  </div>
+
+  <button onclick="downloadCSV()">Download CSV</button>
+  <button onclick="tempChart.resetZoom()">Reset Zoom</button>
+
+  <script>
+    const ctx = document.getElementById('tempChart').getContext('2d');
+    const tempChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Temperature (°C)',
+            data: [],
+            borderColor: 'rgba(255,99,132,1)',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Current (A)',
+            data: [],
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.1,
+            yAxisID: 'y1'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            type: 'category',
+            title: { display: true, text: 'Time (s)' }
+          },
+          y: {
+            beginAtZero: false,
+            title: { display: true, text: 'Temperature (°C)' },
+            position: 'left'
+          },
+          y1: {
+            beginAtZero: true,
+            title: { display: true, text: 'Current (A)' },
+            position: 'right',
+            grid: {
+              drawOnChartArea: false
+            }
+          }
+        },
+        plugins: {
+          zoom: {
+            pan: {
+              enabled: true,
+              mode: 'x',
+              threshold: 10
+            },
+            zoom: {
+              wheel: { enabled: true },
+              pinch: { enabled: true },
+              mode: 'x'
+            }
+          }
+        }
+      }
+    });
+
+    let csvData = [["Time (s)", "Temperature (°C)", "Current (A)"]];
+    let timeCounter = 0;
+
+    function fetchTemperature() {
+      fetch("http://10.1.1.115/api/temperature")
+        .then(res => res.json())
+        .then(data => {
+          if (data && typeof data.temperature === 'number' && typeof data.current === 'number') {
+            const temp = parseFloat(data.temperature).toFixed(2);
+            const current = parseFloat(data.current).toFixed(2);
+            
+            document.getElementById("status").innerText = "Current Temp: " + temp + "°C";
+            document.getElementById("currentStatus").innerText = "Current Draw: " + current + " A";
+
+            timeCounter += 2;
+
+            tempChart.data.labels.push(timeCounter + "s");
+            tempChart.data.datasets[0].data.push(temp);
+            tempChart.data.datasets[1].data.push(current);
+
+            csvData.push([timeCounter, temp, current]);
+
+            tempChart.update();
+          } else {
+            throw new Error("Invalid data format from server.");
+          }
+        })
+        .catch(err => {
+          document.getElementById("status").innerText = "Error fetching data.";
+          document.getElementById("currentStatus").innerText = "";
+          console.error("Fetch error:", err);
+        });
+    }
+
+    function downloadCSV() {
+      let csvContent = "data:text/csv;charset=utf-8," 
+        + csvData.map(e => e.join(",")).join("\n");
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csvContent));
+      link.setAttribute("download", "temperature_current_log.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    setInterval(fetchTemperature, 2000);
+  </script>
+</body>
+</html>
