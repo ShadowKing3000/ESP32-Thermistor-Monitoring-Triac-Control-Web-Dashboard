@@ -386,7 +386,7 @@ void loop() {
   float rmsADC = sqrt(meanSquare);
   float rmsVoltage = (rmsADC / adcMax) * vcc;
   float currentRMS = (rmsVoltage * 1000.0) / mVperAmp;
-  currentRMS_global = currentRMS * 1.41 * 1.22;
+  currentRMS_global = currentRMS * 1.41 * 1.22; //1.22 is the calibration factor, and 1.41; for getting peak value
 
   // Serial debug (optional)
   Serial.print("Temp: ");
